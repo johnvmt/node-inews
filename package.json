@@ -1,0 +1,20 @@
+{
+  "name": "node-inews",
+  "version": "0.0.1",
+  "description": "Connects to an Avid iNews server over FTP",
+  "license": "MIT",
+  "author": {
+    "name": "John Murphy-Teixidor",
+    "email": "johnvmt@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://bitbucket.org/cnndatastore/node-inews.git"
+  },
+  "private": true,
+  "main": "inewsFtp.js",
+  "dependencies": {
+    "ftp": "0.3.x",
+    "htmlparser": "1.7.x"
+  }
+}
