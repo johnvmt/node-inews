@@ -20,6 +20,12 @@ Will not connect unless a function that requires the connection (eg: cwd, list) 
 
 	});
 
+### List files in directory ###
+
+	conn.list(function(error, fileList) {
+
+	});
+
 ### Get and parse a story into parts ###
 
 	 conn.getStory('FILENAME:FILENAME:FILENAME', function(error, story) {
