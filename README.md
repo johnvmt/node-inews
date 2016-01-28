@@ -16,7 +16,7 @@ Will not connect unless a function that requires the connection (eg: cwd, list) 
 
 ### Change Directory ###
 
-	conn.cwd("PATH.TO.INEWS.CUE", function(error, directory) {
+	conn.cwd("PATH.TO.INEWS.QUEUE", function(error, directory) {
 
 	});
 
