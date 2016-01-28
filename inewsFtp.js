@@ -3,7 +3,6 @@ module.exports = function(config) {
 };
 
 var FtpClient = require('ftp');
-var fs = require('fs');
 var parseNsml = require('./inewsStoryParser');
 
 function InewsClient(config) {

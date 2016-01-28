@@ -1,5 +1,5 @@
 {
-  "name": "node-inews",
+  "name": "inews",
   "version": "0.0.1",
   "description": "Connects to an Avid iNews server over FTP",
   "license": "MIT",
