@@ -18,6 +18,11 @@ InewsClient.prototype.connect = function(callback) {
 			callback(null, true);
 		});
 
+		this._ftpConn.on('error', function(error) {
+			console.log("ERROR-EVENT");
+			callback(error, null);
+		});
+
 		try {
 			this._ftpConn.connect(this.config);
 		}
