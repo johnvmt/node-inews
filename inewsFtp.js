@@ -12,77 +12,78 @@ function InewsClient(config) {
 
 InewsClient.prototype.connect = function(callback) {
 	if(this._ftpConn.connected)
-		callback(null, true);
+		callback(null, this._ftpConn);
 	else {
 		this._ftpConn.on('ready', function() {
-			callback(null, true);
+			callback(null, this);
 		});
 
 		this._ftpConn.on('error', function(error) {
-			console.log("ERROR-EVENT");
-			callback(error, null);
+			callback(error, this);
 		});
 
-		try {
-			this._ftpConn.connect(this.config);
-		}
-		catch(error) {
-			console.log("ERROR");
-			console.log(error);
-		}
+		this._ftpConn.connect(this.config);
 	}
 };
 
 InewsClient.prototype.cwd = function(path, callback) {
-	var ftpConn = this._ftpConn;
-	this.connect(function() {
-		ftpConn.cwd(path, callback);
+	this.connect(function(error, ftpConn) {
+		if(error)
+			callback(error, null);
+		else
+			ftpConn.cwd(path, callback);
 	});
 };
 
 InewsClient.prototype.list = function(callback) {
 	var self = this;
-	var ftpConn = this._ftpConn;
-	this.connect(function() {
-		ftpConn.list(function(error, list) {
-			if(error)
-				callback(error, null);
-			else {
-				var fileNames = [];
-				list.forEach(function(listItem) {
-					var file = self._fileFromListItem(listItem);
-					if(typeof file !== 'undefined')
-						fileNames.push(file);
-				});
-				callback(null, fileNames);
-			}
-		});
+	self.connect(function(error, ftpConn) {
+		if(error)
+			callback(error, null);
+		else {
+			ftpConn.list(function (error, list) {
+				if (error)
+					callback(error, null);
+				else {
+					var fileNames = [];
+					 list.forEach(function (listItem) {
+						var file = self._fileFromListItem(listItem);
+						if (typeof file !== 'undefined')
+							fileNames.push(file);
+					});
+					callback(null, fileNames);
+				}
+			});
+		}
 	});
 };
 
 InewsClient.prototype.get = function(file, callback) {
-	var ftpConn = this._ftpConn;
-	this.connect(function() {
-		ftpConn.get(file, function(error, stream) {
-			if(error)
-				callback(error, null);
-			else {
-				var storyXml = "";
-				stream.setEncoding('utf8');
-				stream.on('data', function(chunk) {
-					storyXml += chunk;
-				});
-				stream.once('close', function() {
-					callback(null, storyXml);
-				});
-			}
-		});
+	this.connect(function(error, ftpConn) {
+		if(error)
+			callback(error, null);
+		else {
+			ftpConn.get(file, function(error, stream) {
+				if (error)
+					callback(error, null);
+				else {
+					var storyXml = "";
+					stream.setEncoding('utf8');
+					stream.on('data', function (chunk) {
+						storyXml += chunk;
+					});
+					stream.once('close', function () {
+						callback(null, storyXml);
+					});
+				}
+			});
+		}
 	});
 };
 
 InewsClient.prototype.getStory = function(file, callback) {
 	var self = this;
-	this.get(file, function(error, storyXml) {
+	self.get(file, function(error, storyXml) {
 		if(error)
 			callback(error, null);
 		else
