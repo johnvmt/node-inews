@@ -122,12 +122,15 @@ InewsClient.prototype._dateFromListItem = function(listItem) {
 	var dateParts = listItem.match(pattern);
 
 	try {
-		if(typeof dateParts[4] !== 'undefined')
-			var dateStr = dateParts[1] + " " + dateParts[2] + " " + new Date().getFullYear() + " " + dateParts[3];
+		if(typeof dateParts[4] !== 'undefined') {
+			var dateNow = new Date();
+			var dateModified = new Date(dateParts[1] + " " + dateParts[2] + " " + dateNow.getFullYear() + " " + dateParts[3]);
+			if(dateModified.getMonth() > dateNow.getMonth()) // change to last year if the date would fall in the future
+				dateModified.setFullYear(dateNow.getFullYear() - 1);
+			return dateModified;
+		}
 		else
-			var dateStr = dateParts[0];
-
-		return new Date(dateStr);
+			return new Date(dateParts[0]);
 	}
 	catch(error) {
 		return undefined;
