@@ -12,10 +12,19 @@ function InewsClient(config) {
 
 InewsClient.prototype.connect = function(callback) {
 	if(this._ftpConn.connected)
-		callback();
+		callback(null, true);
 	else {
-		this._ftpConn.on('ready', callback);
-		this._ftpConn.connect(this.config);
+		this._ftpConn.on('ready', function() {
+			callback(null, true);
+		});
+
+		try {
+			this._ftpConn.connect(this.config);
+		}
+		catch(error) {
+			console.log("ERROR");
+			console.log(error);
+		}
 	}
 };
 
