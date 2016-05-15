@@ -1,4 +1,5 @@
 module.exports = function(nsml, callback) {
+	console.log(nsml);
 	var htmlparser = require("htmlparser");
 
 	var parseHandler = new htmlparser.DefaultHandler(function (error, dom) {
@@ -65,9 +66,8 @@ module.exports = function(nsml, callback) {
 	function nodesToArray(nodes, tag) {
 		var lines = [];
 
-		nodes.forEach(function(node) {
+		nodes.forEach(function(node, index) {
 			if(node.type === 'tag') {
-				//console.log(node);
 				if(node.name === tag)
 					lines.push(stringifyNodes(node.children));
 //				else
@@ -75,7 +75,13 @@ module.exports = function(nsml, callback) {
 			}
 		});
 
+		// Filter out leading lines in production cues
+		lines = lines.filter(function(line, index) {
+			return line > 0 || line != ']] S3.0 G 0 [[';
+		});
+
 		return lines;
+
 	}
 
 	function parseNsmlNode(node, story) {
