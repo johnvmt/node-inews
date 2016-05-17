@@ -1,5 +1,4 @@
 module.exports = function(nsml, callback) {
-	console.log(nsml);
 	var htmlparser = require("htmlparser");
 
 	var parseHandler = new htmlparser.DefaultHandler(function (error, dom) {
