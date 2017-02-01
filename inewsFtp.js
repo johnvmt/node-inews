@@ -1,28 +1,60 @@
-module.exports = function(config) {
-	return new InewsClient(config);
-};
-
+var EventEmitter = require('wolfy87-eventemitter');
 var FtpClient = require('ftp');
 var parseNsml = require('./inewsStoryParser');
 
 function InewsClient(config) {
-	this.config = config;
-	this._ftpConn = new FtpClient();
+	var self = this;
+	self.config = config;
+	self._ftpConn = new FtpClient();
+
+	var events = ['ready', 'error', 'close', 'end'];
+
+	events.forEach(function(event) {
+		self._ftpConn.on(event, function() {
+			self.emit.apply(self, [event].concat(Array.prototype.slice.call(arguments)));
+		});
+	});
 }
 
+InewsClient.prototype.__proto__ = EventEmitter.prototype;
+
+InewsClient.prototype.disconnect = function(callback) {
+	var self = this;
+	if(self._ftpConn.connected) {
+		if(typeof callback == 'function') {
+			self.once('end', function() {
+				callback(null, true);
+			})	;
+		}
+		self._ftpConn.end();
+	}
+
+};
+
 InewsClient.prototype.connect = function(callback) {
-	if(this._ftpConn.connected)
-		callback(null, this._ftpConn);
+	var self = this;
+	if(self._ftpConn.connected)
+		callbackSafe(null, self._ftpConn);
 	else {
-		this._ftpConn.on('ready', function() {
-			callback(null, this);
+		var returned = false;
+		self._ftpConn.once('ready', function() {
+			if(!returned)
+				callbackSafe(null, self);
+			returned = true;
 		});
 
-		this._ftpConn.on('error', function(error) {
-			callback(error, this);
+		self._ftpConn.once('error', function(error) {
+			if(!returned)
+				callbackSafe(error, self);
+			returned = true;
 		});
 
-		this._ftpConn.connect(this.config);
+		self._ftpConn.connect(self.config);
+	}
+
+	function callbackSafe(error, response) {
+		if(typeof callback == 'function')
+			callback(error, response);
 	}
 };
 
@@ -155,4 +187,8 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 	var pattern = /[A-Z0-9]{8}:[A-Z0-9]{8}:[A-Z0-9]{8}/i;
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[0];
+};
+
+module.exports = function(config) {
+	return new InewsClient(config);
 };

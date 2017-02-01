@@ -15,6 +15,7 @@
   "main": "inewsFtp.js",
   "dependencies": {
     "ftp": "0.3.x",
-    "htmlparser": "1.7.x"
+    "htmlparser": "1.7.x",
+    "wolfy87-eventemitter": "5.1.x"
   }
 }
