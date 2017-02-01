@@ -1,6 +1,6 @@
 {
   "name": "inews",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Connects to an Avid iNews server over FTP",
   "license": "MIT",
   "author": {
@@ -16,6 +16,7 @@
   "dependencies": {
     "ftp": "0.3.x",
     "htmlparser": "1.7.x",
+    "camelCase": "4.0.x",
     "wolfy87-eventemitter": "5.1.x"
   }
 }

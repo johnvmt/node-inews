@@ -1,5 +1,6 @@
 module.exports = function(nsml, callback) {
-	var htmlparser = require("htmlparser");
+	var htmlparser = require('htmlparser');
+	var camelcase = require('camelcase');
 
 	var parseHandler = new htmlparser.DefaultHandler(function (error, dom) {
 		if (error)
@@ -106,7 +107,7 @@ module.exports = function(nsml, callback) {
 					try {
 						var key = node.attribs['id'];
 						var val = node.children[0]['data'];
-						story.fields[key] = val;
+						story.fields[camelcase(key)] = val;
 					}
 					catch(error) {}
 					break;
