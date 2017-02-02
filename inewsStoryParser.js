@@ -1,6 +1,7 @@
 module.exports = function(nsml, callback) {
 	var htmlparser = require('htmlparser');
 	var camelcase = require('camelcase');
+	var unescape = require('unescape');
 
 	var parseHandler = new htmlparser.DefaultHandler(function (error, dom) {
 		if (error)
@@ -95,7 +96,7 @@ module.exports = function(nsml, callback) {
 					catch(error) {}
 					break;
 				case 'body':
-					story.body = stringifyNodes(node.children);
+					story.body = unescape(stringifyNodes(node.children));
 					break;
 				case 'storyid':
 					try {
@@ -107,7 +108,7 @@ module.exports = function(nsml, callback) {
 					try {
 						var key = node.attribs['id'];
 						var val = node.children[0]['data'];
-						story.fields[camelcase(key)] = val;
+						story.fields[camelcase(key)] = unescape(val);
 					}
 					catch(error) {}
 					break;
