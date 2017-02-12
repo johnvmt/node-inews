@@ -79,9 +79,6 @@ InewsClient.prototype.list = function(callback) {
 				else {
 					var fileNames = [];
 					 list.forEach(function (listItem) {
-
-					 	console.log("LITEM", listItem);
-
 						var file = self._fileFromListItem(listItem);
 						if (typeof file !== 'undefined')
 							fileNames.push(file);
