@@ -79,6 +79,9 @@ InewsClient.prototype.list = function(callback) {
 				else {
 					var fileNames = [];
 					 list.forEach(function (listItem) {
+
+					 	console.log("LITEM", listItem);
+
 						var file = self._fileFromListItem(listItem);
 						if (typeof file !== 'undefined')
 							fileNames.push(file);
@@ -143,10 +146,23 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 		var fileDate = this._dateFromListItem(listItem);
 		if(typeof fileDate !== 'undefined')
 			file['modified'] = fileDate;
+
+		file['flags'] = this._flagsFromListItem(listItem);
+
 		return file;
 	}
 	else
 		return undefined;
+};
+
+InewsClient.prototype._flagsFromListItem = function(listItem) {
+	var flags = {};
+	var pattern = /([^\s]+)/i;
+	var flagParts = listItem.match(pattern);
+
+	flags.floated = (flagParts[0][1] == 'f');
+
+	return flags;
 };
 
 InewsClient.prototype._dateFromListItem = function(listItem) {

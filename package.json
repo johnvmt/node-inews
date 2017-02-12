@@ -1,6 +1,6 @@
 {
   "name": "inews",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Connects to an Avid iNews server over FTP",
   "license": "MIT",
   "author": {
@@ -14,7 +14,7 @@
   "private": true,
   "main": "inewsFtp.js",
   "dependencies": {
-    "camelCase": "4.0.x",
+    "camelcase": "3.0.x",
     "ftp": "0.3.x",
     "htmlparser": "1.7.x",
     "unescape": "^0.2.0",
