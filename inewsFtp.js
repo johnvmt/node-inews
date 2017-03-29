@@ -187,7 +187,7 @@ InewsClient.prototype._listItemIsQueue = function(listItem) {
 };
 
 InewsClient.prototype._queueFromListItem = function(listItem) {
-	var pattern = /.([A-Za-z0-9]*)$/;
+	var pattern = /.([A-Za-z0-9\-]*)$/;
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[1];
 };
