@@ -98,7 +98,8 @@ InewsClient.prototype.get = function(file, callback) {
 			ftpConn.get(file, function(error, stream) {
 				if (error)
 					callback(error, null);
-				else {
+				else if(typeof stream != "undefined") {
+					// TODO handle stream == undefined
 					var storyXml = "";
 					stream.setEncoding('utf8');
 					stream.on('data', function (chunk) {
