@@ -14,26 +14,38 @@ Will not connect unless a function that requires the connection (eg: cwd, list) 
 		'password': "inews-password"
 	});
 
-### Change Directory ###
+### List Files In Directory/Queue ###
 
-	conn.cwd("PATH.TO.INEWS.QUEUE", function(error, directory) {
-
+	conn.list("YOUR.QUEUE.HERE", function(error, dirList) {
+		if(!error) {
+			dirList.forEach(function(story) {
+				console.log(story.file);
+			}
+		}
 	});
+	
+### Retrieve all stories in a queue ###
 
-### List files in directory ###
-
-	conn.list(function(error, fileList) {
-
+	var inewsQueue = "YOUR.QUEUE.HERE";
+	conn.list(inewsQueue, function(error, dirList) {
+		if(!error) {
+			dirList.forEach(function(storyFile) {
+				conn.story(inewsQueue, storyFile.file, function(error, storyDetails) {
+    				console.log(error, storyDetails);
+    			});
+    		}
+		}
 	});
+	
+### Retrieve NSML all stories in a queue ###
 
-### Get and parse a story into parts ###
-
-	 conn.getStory('FILENAME:FILENAME:FILENAME', function(error, story) {
-	 
-	 });
-	 
-### Get a story's raw NSML ###
-
-	 conn.get('FILENAME:FILENAME:FILENAME', function(error, story) {
-	 
-	 });
+	var inewsQueue = "YOUR.QUEUE.HERE";
+	conn.list(inewsQueue, function(error, dirList) {
+		if(!error) {
+			dirList.forEach(function(storyFile) {
+				conn.storyNsml(inewsQueue, storyFile.file, function(error, storyNsml) {
+    				console.log(error, storyNsml);
+    			});
+    		}
+		}
+	});
