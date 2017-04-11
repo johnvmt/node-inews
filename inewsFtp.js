@@ -185,6 +185,9 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 		var fileName = this._filenameFromListItem(listItem);
 		if(typeof fileName !== 'undefined')
 			var file = {type: 'file', file: fileName};
+
+		file['identifier'] = this._storyIdentifierFromFilename(fileName);
+		file['locator'] = this._storyLocatorFromFilename(fileName);
 	}
 	else if(this._listItemIsQueue(listItem)) {
 		var fileName = this._queueFromListItem(listItem);
@@ -203,6 +206,30 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 	}
 	else
 		return undefined;
+};
+
+/**
+ * Get the story ID from the fileName (in XXXXXX:YYYYYY:ZZZZZZ, it will return XXXXXX)
+ * http://resources.avid.com/SupportFiles/attach/Broadcast/inews-ftp-server.pdf
+ * @param fileName
+ * @returns {*}
+ * @private
+ */
+InewsClient.prototype._storyIdentifierFromFilename = function(fileName) {
+	var fileParts = fileName.split(':');
+	return fileParts[0];
+};
+
+/**
+ * Get the story locator from the fileName (in XXXXXX:YYYYYY:ZZZZZZ, it will return YYYYYY:ZZZZZZ)
+ * http://resources.avid.com/SupportFiles/attach/Broadcast/inews-ftp-server.pdf
+ * @param fileName
+ * @returns {*}
+ * @private
+ */
+InewsClient.prototype._storyLocatorFromFilename = function(fileName) {
+	var fileParts = fileName.split(':');
+	return fileParts[1] + ':' + fileParts[2];
 };
 
 InewsClient.prototype._flagsFromListItem = function(listItem) {
