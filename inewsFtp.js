@@ -5,7 +5,11 @@ var IndexedLinkedList = require('./IndexedLinkedList');
 
 function InewsClient(config) {
 	var self = this;
-	self.config = config;
+	var configDefault = {
+		timeout: 60000 // 1 minute
+	};
+
+	self.config = self._objectMerge(configDefault, config);
 	self._ftpConn = new FtpClient();
 	self._queue = this._callbackQueue();
 
@@ -19,18 +23,6 @@ function InewsClient(config) {
 }
 
 InewsClient.prototype.__proto__ = EventEmitter.prototype;
-
-InewsClient.prototype.disconnect = function(callback) {
-	var self = this;
-	if(self._ftpConn.connected) {
-		if(typeof callback === 'function') {
-			self.once('end', function() {
-				callback(null, true);
-			});
-		}
-		self._ftpConn.end();
-	}
-};
 
 InewsClient.prototype.connect = function(callback) {
 	var self = this;
@@ -56,6 +48,35 @@ InewsClient.prototype.connect = function(callback) {
 	function callbackSafe(error, response) {
 		if(typeof callback == 'function')
 			callback(error, response);
+	}
+};
+
+InewsClient.prototype.disconnect = function(callback) {
+	var self = this;
+	if(self._ftpConn.connected) {
+		self.once('end', function() {
+			callbackSafe(null, true);
+		});
+		self._ftpConn.end();
+	}
+	else
+		callback(null, true);
+
+	function callbackSafe(error, success) {
+		if(typeof callback == 'function')
+			callback(error, success);
+	}
+};
+
+// Reconnect
+InewsClient.prototype.reconnect = function(callback) {
+	this.disconnect(function() {
+		this.connect(callbackSafe);
+	});
+
+	function callbackSafe(error, success) {
+		if(typeof callback == 'function')
+			callback(error, success);
 	}
 };
 
@@ -275,8 +296,9 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 };
 
 InewsClient.prototype._callbackQueue = function() {
+	var self = this;
 	var callbackQueue = IndexedLinkedList();
-	var functionInProgress = false;
+	var functionTimeout = null;
 	return {
 		add: function(functionCallback, functionArguments) {
 			var functionIndex = uniqueId();
@@ -296,16 +318,27 @@ InewsClient.prototype._callbackQueue = function() {
 	};
 
 	function queueNextSafe() {
-		if(callbackQueue.length && !functionInProgress)
+		if(callbackQueue.length && functionTimeout === null)
 			queueStartNext();
 	}
 
 	function queueStartNext() {
-		functionInProgress = false;
+		clearTimeout(functionTimeout);
+		functionTimeout = null;
 		if(callbackQueue.length) {
-			functionInProgress = true;
 			var nextCallback = callbackQueue.head.data; // TODO add head()/peek() function
 			if(typeof nextCallback.functionCallback === 'function') {
+
+				functionTimeout = setTimeout(function() {
+					console.log("TIMED OUT");
+					self.reconnect(function(error, success) {
+						if(error)
+							console.log("RECONNECT ERROR");
+						else
+							queueStartNext(); // Restart current function
+					});
+				}, self.config.timeout);
+
 				var funcArgs = (Array.isArray(nextCallback.functionArguments)) ? nextCallback.functionCallback : [];
 				funcArgs.push(nextCallback.functionComplete);
 				nextCallback.functionCallback.apply(this, funcArgs);
@@ -321,6 +354,26 @@ InewsClient.prototype._callbackQueue = function() {
 		}
 		return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
 			s4() + '-' + s4() + s4() + s4();
+	}
+};
+
+InewsClient.prototype._objectMerge = function() {
+	var merged = {};
+	this._objectForEach(arguments, function(argument) {
+		for (var attrname in argument) {
+			if(argument.hasOwnProperty(attrname))
+				merged[attrname] = argument[attrname];
+		}
+	});
+	return merged;
+};
+
+InewsClient.prototype._objectForEach = function(object, callback) {
+	// run function on each property (child) of object
+	var property;
+	for(property in object) { // pull keys before looping through?
+		if (object.hasOwnProperty(property))
+			callback(object[property], property, object);
 	}
 };
 
