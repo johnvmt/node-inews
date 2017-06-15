@@ -70,8 +70,9 @@ InewsClient.prototype.disconnect = function(callback) {
 
 // Reconnect
 InewsClient.prototype.reconnect = function(callback) {
-	this.disconnect(function() {
-		this.connect(callbackSafe);
+	var self = this;
+	self.disconnect(function() {
+		self.connect(callbackSafe);
 	});
 
 	function callbackSafe(error, success) {
