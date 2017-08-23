@@ -206,7 +206,7 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 	if(this._listItemIsFile(listItem)) {
 		var fileName = this._filenameFromListItem(listItem);
 		if(typeof fileName !== 'undefined')
-			var file = {type: 'file', file: fileName};
+			var file = {filetype: 'file', file: fileName};
 
 		file['identifier'] = this._storyIdentifierFromFilename(fileName);
 		file['locator'] = this._storyLocatorFromFilename(fileName);
@@ -214,7 +214,7 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 	else if(this._listItemIsQueue(listItem)) {
 		var fileName = this._queueFromListItem(listItem);
 		if(typeof fileName !== 'undefined')
-			var file = {type: 'queue', file: fileName};
+			var file = {filetype: 'queue', file: fileName};
 	}
 
 	if(typeof file !== 'undefined') {
