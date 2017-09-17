@@ -6,12 +6,15 @@ var IndexedLinkedList = require('./IndexedLinkedList');
 function InewsClient(config) {
 	var self = this;
 	var configDefault = {
-		timeout: 60000 // 1 minute
+		timeout: 60000, // 1 minute
+		reconnectTimeout: 5000 // 5 seconds
 	};
 
 	self.config = self._objectMerge(configDefault, config);
-	self._ftpConn = new FtpClient();
 	self._queue = this._callbackQueue();
+	self._ftpConn = new FtpClient();
+	self._connectionCallbacks = [];
+	self._connectionInProgress = false;
 
 	var events = ['ready', 'error', 'close', 'end'];
 
@@ -26,28 +29,53 @@ InewsClient.prototype.__proto__ = EventEmitter.prototype;
 
 InewsClient.prototype.connect = function(callback) {
 	var self = this;
+	if(typeof callback == 'function')
+		self._connectionCallbacks.push(callback);
+
 	if(self._ftpConn.connected)
 		callbackSafe(null, self._ftpConn);
 	else {
-		var returned = false;
-		self._ftpConn.once('ready', function() {
-			if(!returned)
-				callbackSafe(null, self._ftpConn);
-			returned = true;
-		});
+		if(!self._connectionInProgress) {
+			self._connectionInProgress = true;
 
-		self._ftpConn.once('error', function(error) {
-			if(!returned)
-				callbackSafe(error, self._ftpConn);
-			returned = true;
-		});
+			var returned = false;
 
-		self._ftpConn.connect(self.config);
+			function onReady() {
+				if(!returned) {
+					returned = true;
+					removeListeners();
+					callbackSafe(null, self._ftpConn);
+					self._queue.startNext();
+				}
+			}
+
+			function onError(error) {
+				if(!returned) {
+					returned = true;
+					removeListeners();
+					callbackSafe(error, self._ftpConn);
+				}
+			}
+
+			function removeListeners() {
+				self._ftpConn.removeListener('ready', onReady);
+				self._ftpConn.removeListener('error', onError);
+			}
+
+			self._ftpConn.once('ready', onReady);
+			self._ftpConn.once('error', onError);
+			self._ftpConn.connect(self.config);
+		}
 	}
 
 	function callbackSafe(error, response) {
-		if(typeof callback == 'function')
-			callback(error, response);
+		self._connectionInProgress = false;
+
+		while(self._connectionCallbacks.length) {
+			var connectionCallback = self._connectionCallbacks.shift();
+			if(typeof connectionCallback == 'function')
+				connectionCallback(error, response);
+		}
 	}
 };
 
@@ -71,9 +99,26 @@ InewsClient.prototype.disconnect = function(callback) {
 // Reconnect
 InewsClient.prototype.reconnect = function(callback) {
 	var self = this;
-	self.disconnect(function() {
-		self.connect(callbackSafe);
-	});
+	var reconnectAttempts = 0;
+
+	attemptReconnect();
+
+	function attemptReconnect() {
+		self.disconnect(function() {
+			self.connect(function(error, success) {
+				reconnectAttempts++;
+
+				if(error && (typeof self.config.reconnectAttempts != 'number' || self.config.reconnectAttempts < 0 || reconnectAttempts < self.config.reconnectAttempts)) {
+					if(typeof self.config.reconnectTimeout != 'number' || self.config.reconnectTimeout <= 0)
+						attemptReconnect();
+					else
+						setTimeout(attemptReconnect, self.config.reconnectTimeout);
+				}
+				else
+					callbackSafe(error, success);
+			});
+		});
+	}
 
 	function callbackSafe(error, success) {
 		if(typeof callback == 'function')
@@ -85,24 +130,24 @@ InewsClient.prototype.list = function(directory, callback) {
 	var self = this;
 	self._queue.add(function(next) {
 		self._cwd(directory, function(error, success) {
+
 			if(error)
 				callbackSafe(error, null);
 			else {
-				self.connect(function(error, ftpConn) {
-					ftpConn.list(function (error, list) {
-						if (error)
-							callbackSafe(error, null);
-						else {
-							var fileNames = [];
-							list.forEach(function (listItem) {
-								var file = self._fileFromListItem(listItem);
-								if (typeof file !== 'undefined')
-									fileNames.push(file);
-							});
-							callbackSafe(null, fileNames);
-						}
-					});
-				})
+				var ftpConn = self._ftpConn;
+				ftpConn.list(function (error, list) {
+					if (error)
+						callbackSafe(error, null);
+					else {
+						var fileNames = [];
+						list.forEach(function (listItem) {
+							var file = self._fileFromListItem(listItem);
+							if (typeof file !== 'undefined')
+								fileNames.push(file);
+						});
+						callbackSafe(null, fileNames);
+					}
+				});
 			}
 		});
 
@@ -315,6 +360,9 @@ InewsClient.prototype._callbackQueue = function() {
 		},
 		length: function() {
 			return callbackQueue.length;
+		},
+		startNext: function() {
+			queueNextSafe();
 		}
 	};
 
@@ -331,10 +379,9 @@ InewsClient.prototype._callbackQueue = function() {
 			if(typeof nextCallback.functionCallback === 'function') {
 
 				functionTimeout = setTimeout(function() {
-					console.log("TIMED OUT");
 					self.reconnect(function(error, success) {
 						if(error)
-							console.log("RECONNECT ERROR");
+							console.error("RECONNECT ERROR");
 						else
 							queueStartNext(); // Restart current function
 					});
