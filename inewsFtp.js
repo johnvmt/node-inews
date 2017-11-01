@@ -140,11 +140,13 @@ InewsClient.prototype.list = function(directory, callback) {
 						callbackSafe(error, null);
 					else {
 						var fileNames = [];
-						list.forEach(function (listItem) {
-							var file = self._fileFromListItem(listItem);
-							if (typeof file !== 'undefined')
-								fileNames.push(file);
-						});
+						if(Array.isArray(list)) {
+							list.forEach(function (listItem) {
+								var file = self._fileFromListItem(listItem);
+								if (typeof file !== 'undefined')
+									fileNames.push(file);
+							});
+						}
 						callbackSafe(null, fileNames);
 					}
 				});
@@ -381,7 +383,7 @@ InewsClient.prototype._callbackQueue = function() {
 				functionTimeout = setTimeout(function() {
 					self.reconnect(function(error, success) {
 						if(error)
-							console.error("RECONNECT ERROR");
+							console.log("RECONNECT ERROR");
 						else
 							queueStartNext(); // Restart current function
 					});
