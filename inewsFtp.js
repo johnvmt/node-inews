@@ -2,7 +2,6 @@ var EventEmitter = require('wolfy87-eventemitter');
 var FtpClient = require('ftp');
 var JobsQueue = require('jobs-queue');
 var parseNsml = require('./inewsStoryParser');
-var IndexedLinkedList = require('./IndexedLinkedList');
 
 function InewsClient(config) {
 	var self = this;
