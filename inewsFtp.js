@@ -1,5 +1,6 @@
 var EventEmitter = require('wolfy87-eventemitter');
 var FtpClient = require('ftp');
+var JobsQueue = require('jobs-queue');
 var parseNsml = require('./inewsStoryParser');
 var IndexedLinkedList = require('./IndexedLinkedList');
 
@@ -7,11 +8,15 @@ function InewsClient(config) {
 	var self = this;
 	var configDefault = {
 		timeout: 60000, // 1 minute
-		reconnectTimeout: 5000 // 5 seconds
+		reconnectTimeout: 5000, // 5 seconds
+		maxOperations: 5
 	};
 
+	self._queue = JobsQueue();
+	self._lastDirectory = null;
+
 	self.config = self._objectMerge(configDefault, config);
-	self._queue = this._callbackQueue();
+
 	self._ftpConn = new FtpClient();
 	self._connectionCallbacks = [];
 	self._connectionInProgress = false;
@@ -45,7 +50,6 @@ InewsClient.prototype.connect = function(callback) {
 					returned = true;
 					removeListeners();
 					callbackSafe(null, self._ftpConn);
-					self._queue.startNext();
 				}
 			}
 
@@ -128,7 +132,11 @@ InewsClient.prototype.reconnect = function(callback) {
 
 InewsClient.prototype.list = function(directory, callback) {
 	var self = this;
-	self._queue.add(function(next) {
+
+	var maxOperations = (self._lastDirectory == directory) ? self.config.maxOperations : 1;
+	self._lastDirectory = directory;
+
+	self._queue.enqueue(function(next) {
 		self._cwd(directory, function(error, success) {
 
 			if(error)
@@ -158,7 +166,8 @@ InewsClient.prototype.list = function(directory, callback) {
 				callback(error, result);
 			next();
 		}
-	});
+
+	}, {maxSimultaneous: maxOperations});
 };
 
 InewsClient.prototype.story = function(directory, file, callback) {
@@ -172,7 +181,10 @@ InewsClient.prototype.story = function(directory, file, callback) {
 
 InewsClient.prototype.storyNsml = function(directory, file, callback) {
 	var self = this;
-	this._queue.add(function(next) {
+	var maxOperations = (self._lastDirectory == directory) ? self.config.maxOperations : 1;
+	self._lastDirectory = directory;
+
+	self._queue.enqueue(function(next) {
 		self._cwd(directory, function(error, success) {
 			if(error)
 				callbackNext(error, null);
@@ -185,7 +197,7 @@ InewsClient.prototype.storyNsml = function(directory, file, callback) {
 				callback(error, result);
 			next();
 		}
-	});
+	}, {maxSimultaneous: maxOperations});
 };
 
 InewsClient.prototype.queueLength = function() {
@@ -341,70 +353,6 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 	var pattern = /[A-Z0-9]{8}:[A-Z0-9]{8}:[A-Z0-9]{8}/i;
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[0];
-};
-
-InewsClient.prototype._callbackQueue = function() {
-	var self = this;
-	var callbackQueue = IndexedLinkedList();
-	var functionTimeout = null;
-	return {
-		add: function(functionCallback, functionArguments) {
-			var functionIndex = uniqueId();
-			callbackQueue.enqueue(functionIndex, {functionCallback: functionCallback, functionArguments: functionArguments, functionComplete: function() {
-				if(callbackQueue.remove(functionIndex))
-					queueStartNext();
-			}});
-			queueNextSafe();
-			return functionIndex;
-		},
-		remove: function(functionIndex) {
-			return callbackQueue.remove(functionIndex);
-		},
-		length: function() {
-			return callbackQueue.length;
-		},
-		startNext: function() {
-			queueNextSafe();
-		}
-	};
-
-	function queueNextSafe() {
-		if(callbackQueue.length && functionTimeout === null)
-			queueStartNext();
-	}
-
-	function queueStartNext() {
-		clearTimeout(functionTimeout);
-		functionTimeout = null;
-		if(callbackQueue.length) {
-			var nextCallback = callbackQueue.head.data; // TODO add head()/peek() function
-			if(typeof nextCallback.functionCallback === 'function') {
-
-				functionTimeout = setTimeout(function() {
-					self.reconnect(function(error, success) {
-						if(error)
-							console.log("RECONNECT ERROR");
-						else
-							queueStartNext(); // Restart current function
-					});
-				}, self.config.timeout);
-
-				var funcArgs = (Array.isArray(nextCallback.functionArguments)) ? nextCallback.functionCallback : [];
-				funcArgs.push(nextCallback.functionComplete);
-				nextCallback.functionCallback.apply(this, funcArgs);
-			}
-		}
-	}
-
-	function uniqueId() {
-		function s4() {
-			return Math.floor((1 + Math.random()) * 0x10000)
-				.toString(16)
-				.substring(1);
-		}
-		return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-			s4() + '-' + s4() + s4() + s4();
-	}
 };
 
 InewsClient.prototype._objectMerge = function() {
