@@ -8,47 +8,78 @@ function InewsClient(config) {
 	var configDefault = {
 		timeout: 60000, // 1 minute
 		reconnectTimeout: 5000, // 5 seconds
-		maxOperations: 5
+		maxOperations: 5,
+		maxOperationAttempts: 5
 	};
-
-	self._queue = JobsQueue();
-	self._lastDirectory = null;
 
 	self.config = self._objectMerge(configDefault, config);
 
-	self._ftpConn = new FtpClient();
+	if(!Array.isArray(self.config.hosts) && typeof self.config.host === 'string')
+		self.config.hosts = [self.config.host];
+
+	self._queue = JobsQueue();
+	self._lastDirectory = null;
 	self._connectionCallbacks = [];
 	self._connectionInProgress = false;
 
-	var events = ['ready', 'error', 'close', 'end'];
+	self._ftpConn = new FtpClient();
 
-	events.forEach(function(event) {
-		self._ftpConn.on(event, function() {
-			self.emit.apply(self, [event].concat(Array.prototype.slice.call(arguments)));
+	// Capture FTP connection events
+	self.status = 'disconnected';
+	self._objectForEach({ready: 'connected', error: 'error', close: 'disconnected', end: 'disconnected'}, function(eventStatus, eventName) {
+		// Re-emit event
+		self._ftpConn.on(eventName, function() {
+			self._setStatus(eventStatus); // Emit status
+			self.emit.apply(self, [eventName].concat(Array.prototype.slice.call(arguments))); // Re-emit event
 		});
+	});
+
+	// Remove current directory on disconnect
+	self.on('disconnected', function() {
+		self._currentDir = null;
 	});
 }
 
 InewsClient.prototype.__proto__ = EventEmitter.prototype;
 
-InewsClient.prototype.connect = function(callback) {
+InewsClient.prototype.connect = function(callback, forceDisconnect) {
 	var self = this;
-	if(typeof callback == 'function')
+
+	if(typeof callback === 'function')
 		self._connectionCallbacks.push(callback);
 
-	if(self._ftpConn.connected)
+	forceDisconnect = (typeof forceDisconnect === 'boolean') ? forceDisconnect : false;
+
+	if(self._ftpConn !== null && self._ftpConn.connected && !forceDisconnect)
 		callbackSafe(null, self._ftpConn);
-	else {
-		if(!self._connectionInProgress) {
-			self._connectionInProgress = true;
+	else if(!self._connectionInProgress){
+		self._connectionInProgress = true;
+		self._currentDir = null;
+		var reconnectAttempts = 0;
+
+		attemptReconnect();
+
+		function attemptReconnect() {
+			if(forceDisconnect || reconnectAttempts > 0) {
+				self.disconnect(function() {
+					connect(connectResult);
+				});
+			}
+			else
+				connect(connectResult);
+		}
+
+		function connect(connectResult) {
+			self._setStatus('connecting');
 
 			var returned = false;
 
 			function onReady() {
 				if(!returned) {
 					returned = true;
+					self._currentDir = null;
 					removeListeners();
-					callbackSafe(null, self._ftpConn);
+					connectResult(null, self._ftpConn);
 				}
 			}
 
@@ -56,7 +87,7 @@ InewsClient.prototype.connect = function(callback) {
 				if(!returned) {
 					returned = true;
 					removeListeners();
-					callbackSafe(error, self._ftpConn);
+					connectResult(error, self._ftpConn);
 				}
 			}
 
@@ -65,15 +96,33 @@ InewsClient.prototype.connect = function(callback) {
 				self._ftpConn.removeListener('error', onError);
 			}
 
+			var ftpConnConfig = {
+				host: self.config.hosts[reconnectAttempts % self.config.hosts.length], // cycle through server
+				user: self.config.user,
+				password: self.config.password
+			};
+
 			self._ftpConn.once('ready', onReady);
 			self._ftpConn.once('error', onError);
-			self._ftpConn.connect(self.config);
+			self._ftpConn.connect(ftpConnConfig);
+		}
+
+		function connectResult(error, ftpConn) {
+			reconnectAttempts++;
+
+			if(error && (typeof self.config.reconnectAttempts !== 'number' || self.config.reconnectAttempts < 0 || reconnectAttempts < self.config.reconnectAttempts)) {
+				if(typeof self.config.reconnectTimeout != 'number' || self.config.reconnectTimeout <= 0)
+					attemptReconnect();
+				else
+					setTimeout(attemptReconnect, self.config.reconnectTimeout);
+			}
+			else
+				callbackSafe(error, ftpConn);
 		}
 	}
 
 	function callbackSafe(error, response) {
 		self._connectionInProgress = false;
-
 		while(self._connectionCallbacks.length) {
 			var connectionCallback = self._connectionCallbacks.shift();
 			if(typeof connectionCallback == 'function')
@@ -99,78 +148,53 @@ InewsClient.prototype.disconnect = function(callback) {
 	}
 };
 
-// Reconnect
-InewsClient.prototype.reconnect = function(callback) {
-	var self = this;
-	var reconnectAttempts = 0;
-
-	attemptReconnect();
-
-	function attemptReconnect() {
-		self.disconnect(function() {
-			self.connect(function(error, success) {
-				reconnectAttempts++;
-
-				if(error && (typeof self.config.reconnectAttempts != 'number' || self.config.reconnectAttempts < 0 || reconnectAttempts < self.config.reconnectAttempts)) {
-					if(typeof self.config.reconnectTimeout != 'number' || self.config.reconnectTimeout <= 0)
-						attemptReconnect();
-					else
-						setTimeout(attemptReconnect, self.config.reconnectTimeout);
-				}
-				else
-					callbackSafe(error, success);
-			});
-		});
-	}
-
-	function callbackSafe(error, success) {
-		if(typeof callback == 'function')
-			callback(error, success);
-	}
-};
-
 InewsClient.prototype.list = function(directory, callback) {
 	var self = this;
 
 	var maxOperations = (self._lastDirectory == directory) ? self.config.maxOperations : 1;
 	self._lastDirectory = directory;
 
-	self._queue.enqueue(function(next) {
-		self._cwd(directory, function(error, success) {
-
+	// Return job controller
+	return self._connectedEnqueue(function(jobComplete) {
+		self.connect(function(error, ftpConnection) {
 			if(error)
-				callbackSafe(error, null);
+				jobComplete(error, null);
 			else {
-				var ftpConn = self._ftpConn;
-				ftpConn.list(function (error, list) {
-					if (error)
-						callbackSafe(error, null);
+				self._cwd(directory, function(error, success) {
+					if(error)
+						jobComplete(error, null);
 					else {
-						var fileNames = [];
-						if(Array.isArray(list)) {
-							list.forEach(function (listItem) {
-								var file = self._fileFromListItem(listItem);
-								if (typeof file !== 'undefined')
-									fileNames.push(file);
-							});
-						}
-						callbackSafe(null, fileNames);
+						self._ftpConn.list(function(error, list) {
+							if (error)
+								jobComplete(error, null);
+							else {
+								var fileNames = [];
+								if(Array.isArray(list)) {
+									list.forEach(function (listItem) {
+										var file = self._fileFromListItem(listItem);
+										if (typeof file !== 'undefined')
+											fileNames.push(file);
+									});
+								}
+								jobComplete(null, fileNames);
+							}
+						});
 					}
 				});
 			}
 		});
 
-		function callbackSafe(error, result) {
-			if(typeof callback === 'function')
-				callback(error, result);
-			next();
-		}
+	}, {maxSimultaneous: maxOperations}, callbackSafe);
 
-	}, {maxSimultaneous: maxOperations});
+	function callbackSafe(error, result) {
+		if(typeof callback === 'function')
+			callback(error, result);
+	}
 };
 
 InewsClient.prototype.story = function(directory, file, callback) {
-	this.storyNsml(directory, file, function(error, storyNsml) {
+	// Return job controller
+	return this.storyNsml(directory, file, function(error, storyNsml) {
 		if(error)
 			callback(error, storyNsml);
 		else
@@ -178,77 +202,100 @@ InewsClient.prototype.story = function(directory, file, callback) {
 	});
 };
 
+InewsClient.prototype._connectedEnqueue = function(operation, options, callback) {
+
+	// Calculate max operations
+
+	var jobController = this.enqueue(operation, this.config.maxOperationAttempts, this.config.timeout, function(error, operationContinue) {
+		// On failure
+		// If disconnected, wait for ready, then restart
+		operationContinue();
+
+	}, function(error, result) {
+		callback(error, result);
+
+	}, options);
+
+	return jobController;
+};
+
 InewsClient.prototype.storyNsml = function(directory, file, callback) {
 	var self = this;
+
 	var maxOperations = (self._lastDirectory == directory) ? self.config.maxOperations : 1;
 	self._lastDirectory = directory;
 
-	self._queue.enqueue(function(next) {
-		self._cwd(directory, function(error, success) {
+	// Return job controller
+	return self._connectedEnqueue(function(jobComplete) {
+		self.connect(function(error, ftpConnection) {
 			if(error)
-				callbackNext(error, null);
-			else
-				self._get(file, callbackNext);
+				jobComplete(error, null);
+			else {
+				self._cwd(directory, function(error, success) {
+					if(error)
+						jobComplete(error, null);
+					else
+						self._get(file, jobComplete);
+				});
+			}
 		});
 
-		function callbackNext(error, result) {
-			if(typeof callback === 'function')
-				callback(error, result);
-			next();
-		}
-	}, {maxSimultaneous: maxOperations});
+	}, {maxSimultaneous: maxOperations}, callbackSafe);
+
+	function callbackSafe(error, result) {
+		if(typeof callback === 'function')
+			callback(error, result);
+	}
 };
 
 InewsClient.prototype.queueLength = function() {
-	return this._queue.length();
+	return this._queue.queued;
 };
 
-InewsClient.prototype._cwd = function(requestPath, callback) {
-	var self = this;
-	self.connect(function(error, ftpConn) {
-		if(error)
-			callback(error, null);
-		else if(self._currentDir === requestPath) // already in this directory
-			callback(null, requestPath);
-		else {
-			ftpConn.cwd(requestPath, function(error, cwdPath) {
-				if(!error)
-					self._currentDir = cwdPath;
-				callback(error, cwdPath);
-			});
-		}
-	});
+InewsClient.prototype._setStatus = function(status) {
+	if(this.status !== status) {
+		this.status = status;
+		this.emit('status', this.status);
+	}
 };
 
-InewsClient.prototype._get = function(file, callback) {
+InewsClient.prototype._cwd = function(requestPath, cwdComplete) {
 	var self = this;
-	self.connect(function(error, ftpConn) {
-		if(error)
-			callback(error, null);
-		else {
-			ftpConn.get(file, function(error, stream) {
-				if (error)
-					callback(error, null);
-				else if(stream) {
-					var storyXml = "";
+	if(self._currentDir === requestPath) // already in this directory
+		cwdComplete(null, requestPath);
+	else {
+		self._ftpConn.cwd(requestPath, function(error, cwdPath) {
+			if(!error)
+				self._currentDir = cwdPath;
+			cwdComplete(error, cwdPath);
+		});
+	}
+};
 
-					stream.setEncoding('utf8');
+InewsClient.prototype._get = function(file, getComplete) {
+	var self = this;
 
-					stream.on('error', function() {
-						console.log("STREAM-ERROR 2")
-					});
+	self._ftpConn.get(file, function(error, stream) {
+		if (error)
+			getComplete(error, null);
+		else if(stream) {
+			var storyXml = "";
 
-					stream.on('data', function (chunk) {
-						storyXml += chunk;
-					});
-					stream.once('close', function () {
-						callback(null, storyXml);
-					});
-				}
-				else
-					callback("no_stream", null);
+			stream.setEncoding('utf8');
+
+			stream.on('error', function() {
+				console.log("STREAM-ERROR 2")
+			});
+
+			stream.on('data', function (chunk) {
+				storyXml += chunk;
+			});
+			stream.once('close', function () {
+				getComplete(null, storyXml);
 			});
 		}
+		else
+			getComplete("no_stream", null);
 	});
 };
 
@@ -353,6 +400,93 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[0];
 };
+
+InewsClient.prototype.enqueue = function(operation, maxOperationAttempts, operationTimeout, errorCallback, finalCallback, options) {
+	var self = this;
+	var operationComplete = false;
+
+	var jobController = self._queue.enqueue(jobOperation, options);
+
+	return {
+		cancel: function() {
+			operationComplete = true;
+			jobController.cancel();
+		},
+		complete: function() {
+			operationComplete = true;
+			jobController.complete();
+		},
+		restart: function() {
+			jobController.restart();
+		}
+	};
+
+	function jobOperation(next) {
+		self._attemptOperation(timedOperation, maxOperationAttempts, errorCallback, function(error, result) {
+			callbackSafe(error, result);
+			next();
+		});
+	}
+
+	function timedOperation(callback) {
+		self._timedOperation(operation, operationTimeout, function(error, result) {
+			if(!operationComplete) // Only continue if not canceled
+				callback(error, result);
+		});
+	}
+
+	function callbackSafe(error, result) {
+		if(!operationComplete) {
+			operationComplete = true;
+			if(typeof finalCallback === 'function')
+				finalCallback(error, result);
+		}
+	}
+};
+
+InewsClient.prototype._attemptOperation = function(operation, maxAttempts, errorCallback, finalCallback) {
+	var currentAttempt = 0;
+	attemptOperation();
+
+	function attemptOperation() {
+		currentAttempt++;
+		var operationAttempt = currentAttempt;
+		operation(function (error, result) {
+			if(error && (typeof maxAttempts !== 'number' || maxAttempts < 0 || currentAttempt < maxAttempts)) {
+				errorCallback(error, function(continueError) {
+					if(continueError)
+						callbackSafe(operationAttempt, continueError, result);
+					else
+						attemptOperation();
+				});
+			}
+			else
+				callbackSafe(operationAttempt, error, result);
+		});
+	}
+
+	function callbackSafe(operationAttempt, error, result) {
+		if(operationAttempt === currentAttempt) {
+			if(typeof finalCallback === 'function')
+				finalCallback(error, result);
+		}
+	}
+};
+
+InewsClient.prototype._timedOperation = function(operation, timeout, callback) {
+	var self = this;
+
+	var operationTimeout = setTimeout(function() {
+		callback('operation_timeout', null);
+	}, timeout);
+
+	operation(function() {
+		clearTimeout(operationTimeout);
+		callback.apply(self, Array.prototype.slice.call(arguments));
+	});
+};
+
+
 
 InewsClient.prototype._objectMerge = function() {
 	var merged = {};

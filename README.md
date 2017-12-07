@@ -13,6 +13,14 @@ Will not connect unless a function that requires the connection (eg: cwd, list) 
 		'user': "inews-username",
 		'password': "inews-password"
 	});
+	
+Connect with backup servers
+
+	var conn = Inews({
+		'hosts': ["inews-hostname-a", "inews-hostname-b", "inews-hostname-c"],
+		'user': "inews-username",
+		'password': "inews-password"
+	});
 
 ### List Files In Directory/Queue ###
 
