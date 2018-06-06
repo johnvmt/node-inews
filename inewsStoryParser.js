@@ -17,6 +17,7 @@ module.exports = function(nsml, callback) {
 		if(typeof story === 'undefined') {
 			story = {
 				fields: {},
+				meta: {},
 				cues: []
 			};
 		}
@@ -72,7 +73,7 @@ module.exports = function(nsml, callback) {
 				if(node.name === tag)
 					lines.push(stringifyNodes(node.children));
 //				else
-					lines = lines.concat(nodesToArray(node.children, tag));
+				lines = lines.concat(nodesToArray(node.children, tag));
 			}
 		});
 
@@ -97,6 +98,9 @@ module.exports = function(nsml, callback) {
 					break;
 				case 'body':
 					story.body = unescape(stringifyNodes(node.children));
+					break;
+				case 'meta':
+					story.meta = node.attribs;
 					break;
 				case 'storyid':
 					try {
