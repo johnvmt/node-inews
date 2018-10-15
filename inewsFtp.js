@@ -315,6 +315,7 @@ InewsClient.prototype._fileFromListItem = function(listItem) {
 
 		file['identifier'] = this._storyIdentifierFromFilename(fileName);
 		file['locator'] = this._storyLocatorFromFilename(fileName);
+		file['storyName'] = this._storyNameFromListItem(listItem);
 	}
 	else if(this._listItemIsQueue(listItem)) {
 		var fileName = this._queueFromListItem(listItem);
@@ -400,6 +401,13 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[0];
 };
+
+
+InewsClient.prototype._storyNameFromListItem = function(listItem) {
+	var pattern = /(?:[0-9A-F]{8}:?){3} (.+?)$/;
+	var listItemParts = listItem.match(pattern);
+	return Array.isArray(listItemParts) && listItemParts.length > 1 ? listItemParts[1] : '';
+}
 
 InewsClient.prototype.enqueue = function(operation, maxOperationAttempts, operationTimeout, errorCallback, finalCallback, options) {
 	var self = this;
