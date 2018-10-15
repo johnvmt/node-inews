@@ -359,11 +359,6 @@ InewsClient.prototype._storyLocatorFromFilename = function(fileName) {
 	var fileParts = fileName.split(':');
 	return fileParts[1] + ':' + fileParts[2];
 };
-InewsClient.prototype._storyNameFromListItem = function(listItem) {
-	var pattern = /[0-9A-F]{8}:[0-9A-F]{8}:[0-9A-F]{8} (.+?)$/;
-	var listItemParts = listItem.match(pattern);
-	return Array.isArray(listItemParts) && listItemParts.length > 1 ? listItemParts[1] : '';
-}
 
 InewsClient.prototype._flagsFromListItem = function(listItem) {
 	var flags = {};
@@ -406,6 +401,13 @@ InewsClient.prototype._filenameFromListItem = function(listItem) {
 	var matchParts = listItem.match(pattern);
 	return matchParts === null ? undefined : matchParts[0];
 };
+
+
+InewsClient.prototype._storyNameFromListItem = function(listItem) {
+	var pattern = /(?:[0-9A-F]{8}:?){3} (.+?)$/;
+	var listItemParts = listItem.match(pattern);
+	return Array.isArray(listItemParts) && listItemParts.length > 1 ? listItemParts[1] : '';
+}
 
 InewsClient.prototype.enqueue = function(operation, maxOperationAttempts, operationTimeout, errorCallback, finalCallback, options) {
 	var self = this;
