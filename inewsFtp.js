@@ -171,6 +171,7 @@ InewsClient.prototype.list = function(directory, callback) {
 								var fileNames = [];
 								if(Array.isArray(list)) {
 									list.forEach(function (listItem) {
+										console.log(listItem);
 										var file = self._fileFromListItem(listItem);
 										if (typeof file !== 'undefined')
 											fileNames.push(file);
