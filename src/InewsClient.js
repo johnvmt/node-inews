@@ -196,7 +196,7 @@ class InewsClient extends EventEmitter {
 			},
 			retryFilter: (error) => {
 				operationAttempts++;
-				return (operationAttempts < self.config.maxAttempts && error !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
+				return (operationAttempts < self.config.maxAttempts && error.message !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
 			},
 			timeout: self.config.timeout
 		});
@@ -223,7 +223,7 @@ class InewsClient extends EventEmitter {
 			},
 			retryFilter: (error) => {
 				operationAttempts++;
-				return (operationAttempts < self.config.maxAttempts && error !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
+				return (operationAttempts < self.config.maxAttempts && error.message !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
 			},
 			timeout: self.config.timeout
 		});
@@ -266,7 +266,7 @@ class InewsClient extends EventEmitter {
 			},
 			retryFilter: (error) => {
 				operationAttempts++;
-				return (operationAttempts < self.config.maxAttempts && error !== 'cwd_failed');
+				return (operationAttempts < self.config.maxAttempts && error.message !== 'cwd_failed');
 			},
 			timeout: self.config.timeout
 		});
@@ -286,7 +286,7 @@ class InewsClient extends EventEmitter {
 						if(requestedDir === currentDir)
 							resolve(requestedDir);
 						else
-							reject('cwd_failed');
+							reject(new Error('cwd_failed'));
 					});
 
 					if(typeof self._requestedDir !== 'string') {
