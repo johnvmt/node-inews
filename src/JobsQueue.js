@@ -65,7 +65,7 @@ class JobsQueue extends EventEmitter {
 	async attemptJobOnce(job) {
 		return new Promise(async (resolve, reject) => {
 			let jobTimeout = (typeof job.config.timeout === 'number' && job.config.timeout > 0) ? setTimeout(() => {
-				reject('timeout');
+				reject(new Error('timeout'));
 			}, job.config.timeout) : null;
 
 			try {
