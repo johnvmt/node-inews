@@ -1,5 +1,5 @@
-import EventEmitter from 'wolfy87-eventemitter';
-import Promise from 'bluebird';
+import EventEmitter from "wolfy87-eventemitter";
+import Promise from "bluebird";
 
 class JobsQueue extends EventEmitter {
 
@@ -20,9 +20,25 @@ class JobsQueue extends EventEmitter {
 		self.on('enqueue', startQueue);
 		self.on('cancel', startQueue);
 
+		let queued = 0;
+		let running = 0;
+		let requests = 0;
 		function startQueue() {
-			self.emit('queued', this.queued.size);
-			self.emit('running', this.running.size);
+			if(self.queued.size !== queued) {
+				queued = self.queued.size;
+				self.emit('queued', queued);
+			}
+
+			if(self.running.size !== running) {
+				running = self.running.size;
+				self.emit('running', running);
+			}
+
+			if(self.running.size + self.queued.size !== requests) {
+				requests = self.running.size + self.queued.size;
+				self.emit('requests', requests);
+			}
+
 			self.startNext();
 		}
 	}
@@ -37,7 +53,8 @@ class JobsQueue extends EventEmitter {
 
 				try {
 					this.emit('start', job);
-					job.resolve(await this.attemptJobWithRetries(job));
+					job.attempts = this.attemptJobWithRetries(job);
+					job.resolve(await job.attempts);
 				}
 				catch(error) {
 					job.reject(error);
@@ -50,33 +67,48 @@ class JobsQueue extends EventEmitter {
 		}
 	}
 
-	async attemptJobWithRetries(job) {
-		try {
-			return await this.attemptJobOnce(job);
-		}
-		catch(error) {
+	attemptJobWithRetries(job) {
+		const self = this;
+
+		return self.attemptJobOnce(job).catch((error) => {
 			if(typeof job.config.retryFilter === 'function' && job.config.retryFilter(error))
 				return this.attemptJobWithRetries(job);
 			else
 				throw error;
-		}
+		});
 	}
 
-	async attemptJobOnce(job) {
-		return new Promise(async (resolve, reject) => {
-			let jobTimeout = (typeof job.config.timeout === 'number' && job.config.timeout > 0) ? setTimeout(() => {
-				reject(new Error('timeout'));
-			}, job.config.timeout) : null;
-
+	attemptJobOnce(job) {
+		const self = this;
+		return new Promise(async (resolve, reject, onCancel) => {
 			try {
-				resolve(await job.config.start());
+				let startResult = job.config.start();
+				if(startResult instanceof Promise) {
+					const jobTimeout = (typeof job.config.timeout === 'number' && job.config.timeout > 0) ? setTimeout(() => {
+						reject(new Error('timeout'));
+					}, job.config.timeout) : null;
+
+					onCancel(() => {
+						if(typeof startResult.cancel === 'function') {
+							try {
+								startResult.cancel();
+							}
+							catch(error) {
+								self.emit('error', error);
+							}
+						}
+					});
+
+					startResult.then(resolve).catch(reject).finally(() => {
+						if(jobTimeout !== null)
+							clearTimeout(jobTimeout);
+					});
+				}
+				else
+					resolve(startResult);
 			}
 			catch(error) {
 				reject(error);
-			}
-			finally {
-				if(jobTimeout !== null)
-					clearTimeout(jobTimeout);
 			}
 		});
 	}
@@ -100,8 +132,16 @@ class JobsQueue extends EventEmitter {
 					self.queued.delete(job);
 					self.emit('cancel', job);
 				}
+				else if(self.running.has(job)) {
+					job.attempts.cancel();
+					self.running.delete(job);
+				}
 			});
 		});
+	}
+
+	async destroy() {
+		this.removeEvent();
 	}
 }
 

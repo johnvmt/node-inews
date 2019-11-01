@@ -1,2 +1,2 @@
 require = require('esm')(module);
-module.exports = require('./src/InewsClient').default;
+module.exports = require('./src/InewsClient').InewsClient;
