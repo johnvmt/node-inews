@@ -1,6 +1,6 @@
 {
   "name": "inews",
-  "version": "3.0.2",
+  "version": "3.1.0",
   "description": "Connects to an Avid iNews server over FTP",
   "license": "MIT",
   "author": {

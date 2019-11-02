@@ -24,7 +24,8 @@ class InewsConnectionClient extends EventEmitter {
 			maxRunning: 10,
 			maxAttempts: 5,
 			maxReconnectAttempts: null,
-			debug: false
+			debug: false,
+			rootDir: ''
 		}, config);
 
 		// Set status
@@ -413,7 +414,7 @@ class InewsConnectionClient extends EventEmitter {
 		if(InewsConnectionClient.listItemIsFile(listItem)) {
 			let fileName = InewsConnectionClient.filenameFromListItem(listItem);
 			if(fileName !== undefined)
-				file = {fileType: 'file', fileName: fileName};
+				file = {fileType: InewsConnectionClient.FILETYPES.STORY, fileName: fileName};
 			else
 				file = {};
 
@@ -424,7 +425,7 @@ class InewsConnectionClient extends EventEmitter {
 		else if(InewsConnectionClient.listItemIsQueue(listItem)) {
 			let fileName = InewsConnectionClient.queueFromListItem(listItem);
 			if(fileName !== undefined)
-				file = {fileType: 'queue', fileName: fileName};
+				file = {fileType: InewsConnectionClient.FILETYPES.DIRECTORY, fileName: fileName};
 		}
 
 		if(file !== null) {
@@ -510,6 +511,13 @@ class InewsConnectionClient extends EventEmitter {
 		const pattern = /(?:[0-9A-F]{8}:?){3} (.+?)$/;
 		const listItemParts = listItem.match(pattern);
 		return Array.isArray(listItemParts) && listItemParts.length > 1 ? listItemParts[1] : null;
+	}
+
+	static get FILETYPES() {
+		return Object.freeze({
+			STORY: 'STORY',
+			DIRECTORY: 'DIRECTORY'
+		});
 	}
 }
 

@@ -197,7 +197,7 @@ class InewsClient extends EventEmitter {
 			this._connectionClients.delete(connectionClient);
 			await connectionClient.destroy();
 			this.emit('connections', this.connections);
-			this.debug(`Deleting connectionClient`)
+			this._debug(`Deleting connectionClient`)
 		}
     }
 
