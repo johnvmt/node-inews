@@ -14,7 +14,8 @@ class InewsClient extends EventEmitter {
 			minConnections: 0,
             optimalConnectionJobs: 25,
             rotateHosts: true,
-            connectionIdleTimeout: 60000 // 1 minute
+            connectionIdleTimeout: 60000, // 1 minute
+			debug: false
         }, config);
 
 		if(typeof this.config.maxConnections !== 'number' || this.config.maxConnections < 1)
@@ -196,6 +197,7 @@ class InewsClient extends EventEmitter {
 			this._connectionClients.delete(connectionClient);
 			await connectionClient.destroy();
 			this.emit('connections', this.connections);
+			this.debug(`Deleting connectionClient`)
 		}
     }
 
@@ -216,6 +218,11 @@ class InewsClient extends EventEmitter {
 			}, self.config.connectionIdleTimeout);
 			this._connectionClientTimeouts.set(connectionClient, connectionClientTimeout);
 		}
+	}
+
+	_debug() {
+		if(this.config.debug)
+			console.log.apply(console, [(new Date()).toISOString()].concat(Array.prototype.slice.call(arguments)));
 	}
 }
 

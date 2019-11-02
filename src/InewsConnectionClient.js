@@ -23,7 +23,8 @@ class InewsConnectionClient extends EventEmitter {
 			reconnectTimeout: 5000, // 5 seconds
 			maxRunning: 10,
 			maxAttempts: 5,
-			maxReconnectAttempts: null
+			maxReconnectAttempts: null,
+			debug: false
 		}, config);
 
 		// Set status
@@ -76,8 +77,12 @@ class InewsConnectionClient extends EventEmitter {
 		});
 
 		self._jobsQueue.on('error', (error) => {
-			self.emit('error', error)
+			self.emit('error', error);
 		});
+
+		self.on('error', error => {
+			self._debug(error);
+		})
 
 	}
 
@@ -133,13 +138,14 @@ class InewsConnectionClient extends EventEmitter {
 						password: self.config.password
 					};
 
-					console.log("CONNECTING TO ", ftpConnConfig.host);
+					self._debug('Connecting to', ftpConnConfig.host);
 
 					if(reconnectsAttempted > 0 && typeof self.config.reconnectTimeout === 'number' && self.config.reconnectTimeout > 0)
 						await delay(self.config.reconnectTimeout);
 
 					try {
 						await connectFtp(ftpConnConfig);
+						self._debug('Connected to', ftpConnConfig.host);
 						delete self._connectionInProgress;
 						resolve(self._ftpConn);
 						return;
@@ -219,7 +225,6 @@ class InewsConnectionClient extends EventEmitter {
 	}
 
 	story(directory, file) {
-		console.log("DIR", directory, file);
 		return this.storyNsml(directory, file).then(storyNsml => {
 			return parseNsml(storyNsml);
 		});
@@ -388,6 +393,11 @@ class InewsConnectionClient extends EventEmitter {
 					reject('no_stream');
 			});
 		});
+	}
+
+	_debug() {
+		if(this.config.debug)
+			console.log.apply(console, [(new Date()).toISOString()].concat(Array.prototype.slice.call(arguments)));
 	}
 
 	static listItemIsQueue(listItem) {
