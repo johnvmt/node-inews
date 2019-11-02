@@ -65,7 +65,7 @@ Connect with backup servers and up to 10 connections
 	conn.list(inewsQueue)
 	    .then(listItems => {
 	        listItems.forEach((listItem) => {
-        		if(listItem.fileType === 'file') {
+        		if(listItem.fileType === 'STORY') {
         			conn.story(inewsQueue, listItem.fileName)
         			    .then(story => {
         					console.log("STORY", story);
@@ -85,7 +85,7 @@ Connect with backup servers and up to 10 connections
     	conn.list(inewsQueue)
     	    .then(listItems => {
     	        listItems.forEach((listItem) => {
-            		if(listItem.fileType === 'file') {
+            		if(listItem.fileType === 'STORY') {
             			conn.storyNsml(inewsQueue, listItem.fileName)
             			    .then(story => {
             					console.log("STORY", story);
@@ -106,7 +106,7 @@ Connect with backup servers and up to 10 connections
 	conn.list(inewsQueue)
         .then(listItems => {
             listItems.forEach((listItem) => {
-                if(listItem.fileType === 'file') {
+                if(listItem.fileType === 'STORY') {
                     let storyPromise = conn.story(inewsQueue, listItem.fileName);
 
                     storyPromises.add(storyPromise);
@@ -158,7 +158,7 @@ Connect with backup servers and up to 10 connections
     conn.list(inewsQueue)
         .then(listItems => {
             listItems.forEach((listItem) => {
-                if(listItem.fileType === 'file') {
+                if(listItem.fileType === 'STORY') {
                     conn.story(inewsQueue, listItem.fileName)
                         .then(story => {
                             console.log("STORY", story);
