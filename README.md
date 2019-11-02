@@ -172,6 +172,10 @@ Connect with backup servers and up to 10 connections
 	
 ### Changes
 
+#### v3.0.1
+
+- Bugfix to ESM export
+
 #### v3.0.0
 
 - Multiple connections enabled
