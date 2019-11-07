@@ -224,6 +224,10 @@ class InewsClient extends EventEmitter {
 		if(this.config.debug)
 			console.log.apply(console, [(new Date()).toISOString()].concat(Array.prototype.slice.call(arguments)));
 	}
+
+	static get FILETYPES() {
+		return InewsConnectionClient.FILETYPES;
+	}
 }
 
 export default InewsClient
