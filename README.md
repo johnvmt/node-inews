@@ -52,7 +52,7 @@ Connect with backup servers and up to 10 connections
 		.then((dirList) => {
 			dirList.forEach((story) => {
         		console.log(story.fileName);
-        	}
+        	})
 		})
 		.catch((error) => {
 			console.error(error);
