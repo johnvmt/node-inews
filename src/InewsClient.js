@@ -1,6 +1,6 @@
-import EventEmitter from "wolfy87-eventemitter";
-import InewsConnectionClient from "./InewsConnectionClient";
-import NestedMap from "./NestedMap";
+import EventEmitter from "events";
+import InewsConnectionClient from "./InewsConnectionClient.js";
+import NestedMap from "./NestedMap.js";
 
 class InewsClient extends EventEmitter {
 	constructor(config = {}) {
@@ -165,6 +165,7 @@ class InewsClient extends EventEmitter {
         const connectionClient = new InewsConnectionClient(Object.assign({}, this.config, {hosts: hosts}));
 
 		connectionClient.on('error', (error) => {
+			console.log("ERR", error)
 			self.emit('error', error);
 		});
 

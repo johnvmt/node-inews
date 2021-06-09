@@ -1,6 +1,6 @@
 {
   "name": "inews",
-  "version": "3.1.2",
+  "version": "3.2.0",
   "description": "Connects to an Avid iNews server over FTP",
   "license": "MIT",
   "author": {
@@ -9,17 +9,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://bitbucket.org/cnndatastore/node-inews.git"
+    "url": "https://github.org/johnvmt/node-inews.git"
   },
-  "main": "index.js",
+  "type": "module",
+  "main": "src/InewsClient.js",
   "module": "src/InewsClient.js",
   "dependencies": {
-    "bluebird": "^3.7.1",
-    "camelcase": "^5.3.1",
-    "esm": "^3.2.25",
+    "bluebird": "^3.7.2",
+    "camelcase": "^6.2.0",
     "ftp": "^0.3.10",
-    "htmlparser2": "^4.0.0",
-    "unescape": "^1.0.1",
-    "wolfy87-eventemitter": "^5.2.8"
+    "htmlparser2": "^6.1.0",
+    "unescape": "^1.0.1"
   }
 }

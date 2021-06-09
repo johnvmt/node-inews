@@ -1,6 +1,6 @@
 import camelcase from "camelcase";
 import unescape from "unescape";
-import xmlToJSON from "./xmlToJSON";
+import xmlToJSON from "./xmlToJSON.js";
 
 export default async (nsml) => {
 	let story = {

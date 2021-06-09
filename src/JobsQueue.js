@@ -1,4 +1,4 @@
-import EventEmitter from "wolfy87-eventemitter";
+import EventEmitter from "events";
 import Promise from "bluebird";
 
 class JobsQueue extends EventEmitter {

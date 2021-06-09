@@ -1,7 +1,6 @@
-const htmlparser2 = require('htmlparser2');
+import htmlparser2 from "htmlparser2";
 
 export default (nsml) => {
-
     const rootNodes = [];
     const nodeStack = [];
     let currentNode;

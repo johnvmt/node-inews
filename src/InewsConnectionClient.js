@@ -1,9 +1,9 @@
+import EventEmitter from "events";
 import Promise from "bluebird";
 import FtpClient from "ftp";
-import EventEmitter from "wolfy87-eventemitter";
-import JobsQueue from "./JobsQueue";
-import parseNsml from "./inewsStoryParser";
-import NestedMap from "./NestedMap";
+import JobsQueue from "./JobsQueue.js";
+import parseNsml from "./inewsStoryParser.js";
+import NestedMap from "./NestedMap.js";
 
 Promise.config({
 	cancellation: true
@@ -118,45 +118,48 @@ class InewsConnectionClient extends EventEmitter {
 		return this._status;
 	}
 
+	get host() {
+		return (this.hasOwnProperty('_ftpConnConfig') && typeof this._ftpConnConfig === 'object') ? this._ftpConnConfig.host : undefined;
+	}
+
 	connect(forceDisconnect = false) {
 		const self = this;
-
 		return new Promise(async (resolve, reject) => {
-			if(self.status === 'connected' && !forceDisconnect)
-				resolve(self._ftpConn);
+			if(this.status === 'connected' && !forceDisconnect)
+				resolve(this._ftpConn);
 			else if(typeof self._connectionInProgress === 'undefined' || !self._connectionInProgress) { // change to status
-				self._connectionInProgress = true;
-				self._currentDir = null;
+				this._connectionInProgress = true;
+				this._currentDir = null;
 
 				// Retry as many times as allowed (may be infinite)
 				for(let reconnectsAttempted = 0; (typeof self.config.maxReconnectAttempts !== 'number' || self.config.maxReconnectAttempts < 0 || reconnectsAttempted < self.config.maxReconnectAttempts); reconnectsAttempted++) {
 					if(forceDisconnect || reconnectsAttempted > 0)
 						await self.disconnect();
 
-					let ftpConnConfig = {
+					this._ftpConnConfig = {
 						host: self.config.hosts[reconnectsAttempted % self.config.hosts.length], // cycle through server
 						user: self.config.user,
 						password: self.config.password
 					};
 
-					self._debug('Connecting to', ftpConnConfig.host);
+					self._debug('Connecting to', this._ftpConnConfig.host);
 
 					if(reconnectsAttempted > 0 && typeof self.config.reconnectTimeout === 'number' && self.config.reconnectTimeout > 0)
 						await delay(self.config.reconnectTimeout);
 
 					try {
-						await connectFtp(ftpConnConfig);
-						self._debug('Connected to', ftpConnConfig.host);
-						delete self._connectionInProgress;
-						resolve(self._ftpConn);
+						await connectFtp(this._ftpConnConfig);
+						this._debug('Connected to', this._ftpConnConfig.host);
+						delete this._connectionInProgress;
+						resolve(this._ftpConn);
 						return;
 					}
 					catch(error) {
-						self.emit('error', error);
+						this.emit('error', error);
 					}
 				}
 
-				self.emit('error', 'max_reconnect_attempts');
+				this.emit('error', 'max_reconnect_attempts');
 				reject('max_reconnect_attempts');
 			}
 		});
