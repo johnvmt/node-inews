@@ -225,7 +225,7 @@ class InewsConnectionClient extends EventEmitter {
 	async destroy() {
 		await this.disconnect();
 		await this._jobsQueue.destroy();
-		this.removeEvent(); // remove all listeners (garbage collection)
+		this.removeAllListeners(); // remove all listeners (garbage collection)
 	}
 
 	story(directory, file) {

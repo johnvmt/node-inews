@@ -165,7 +165,6 @@ class InewsClient extends EventEmitter {
         const connectionClient = new InewsConnectionClient(Object.assign({}, this.config, {hosts: hosts}));
 
 		connectionClient.on('error', (error) => {
-			console.log("ERR", error)
 			self.emit('error', error);
 		});
 

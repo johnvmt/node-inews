@@ -141,7 +141,7 @@ class JobsQueue extends EventEmitter {
 	}
 
 	async destroy() {
-		this.removeEvent();
+		this.removeAllListeners();
 	}
 }
 
