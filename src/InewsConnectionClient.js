@@ -453,7 +453,7 @@ class InewsConnectionClient extends EventEmitter {
 	 */
 	static storyIdentifierFromFilename(fileName) {
 		let fileParts = fileName.split(':');
-		return fileParts[0];
+		return fileParts[0].toUpperCase();
 	}
 
 	/**
@@ -465,7 +465,7 @@ class InewsConnectionClient extends EventEmitter {
 	 */
 	static storyLocatorFromFilename(fileName) {
 		let fileParts = fileName.split(':');
-		return fileParts[1] + ':' + fileParts[2];
+		return `${fileParts[1]}:${fileParts[2]}`.toUpperCase();
 	};
 
 	static flagsFromListItem(listItem) {
