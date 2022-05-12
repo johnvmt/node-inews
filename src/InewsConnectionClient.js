@@ -13,12 +13,10 @@ class InewsConnectionClient extends EventEmitter {
 	constructor(config) {
 		super();
 
-		const self = this;
-
-		self._pendingPromises = new NestedMap();
+		this._pendingPromises = new NestedMap();
 
 		// Set config
-		self.config = Object.assign({
+		this.config = Object.assign({
 			timeout: 60000, // 1 minute
 			reconnectTimeout: 5000, // 5 seconds
 			maxRunning: 10,
@@ -29,20 +27,20 @@ class InewsConnectionClient extends EventEmitter {
 		}, config);
 
 		// Set status
-		self.status = 'disconnected';
+		this.status = 'disconnected';
 
-		if(!Array.isArray(self.config.hosts) && typeof self.config.host === 'string')
-			self.config.hosts = [self.config.host];
+		if(!Array.isArray(this.config.hosts) && typeof this.config.host === 'string')
+			this.config.hosts = [this.config.host];
 
-		if(!Array.isArray(self.config.hosts) || self.config.hosts.length === 0)
+		if(!Array.isArray(this.config.hosts) || this.config.hosts.length === 0)
 			throw new Error(`Missing hosts option`);
-		if(!self.config.hasOwnProperty('user'))
+		if(!this.config.hasOwnProperty('user'))
 			throw new Error(`Missing user option`);
-		if(!self.config.hasOwnProperty('password'))
+		if(!this.config.hasOwnProperty('password'))
 			throw new Error(`Missing password option`);
 
 		// Map FTP events to status updates
-		self._ftpConn = new FtpClient();
+		this._ftpConn = new FtpClient();
 
 		const mappedFtpEvents = new Map([
 			['ready', 'connected'],
@@ -52,37 +50,37 @@ class InewsConnectionClient extends EventEmitter {
 		]);
 
 		mappedFtpEvents.forEach((clientStatus, ftpEventName) => {
-			self._ftpConn.on(ftpEventName, () => {
-				self.status = clientStatus; // Emit status
-				self.emit.apply(self, [ftpEventName].concat(Array.prototype.slice.call(arguments))); // Re-emit event
+			this._ftpConn.on(ftpEventName, () => {
+				this.status = clientStatus; // Emit status
+				this.emit.apply(this, [ftpEventName].concat(Array.prototype.slice.call(arguments))); // Re-emit event
 			});
 		});
 
 		// Remove current directory on disconnect
-		self.on('disconnected', function() {
-			self._currentDir = null;
+		this.on('disconnected', () => {
+			this._currentDir = null;
 		});
 
-		self._jobsQueue = new JobsQueue();
+		this._jobsQueue = new JobsQueue();
 
-		self._jobsQueue.on('queued', (queuedJobs) => {
-			self.emit('queued', queuedJobs);
+		this._jobsQueue.on('queued', (queuedJobs) => {
+			this.emit('queued', queuedJobs);
 		});
 
-		self._jobsQueue.on('running', (runningJobs) => {
-			self.emit('running', runningJobs);
+		this._jobsQueue.on('running', (runningJobs) => {
+			this.emit('running', runningJobs);
 		});
 
-		self._jobsQueue.on('requests', (totalJobs) => {
-			self.emit('requests', totalJobs);
+		this._jobsQueue.on('requests', (totalJobs) => {
+			this.emit('requests', totalJobs);
 		});
 
-		self._jobsQueue.on('error', (error) => {
-			self.emit('error', error);
+		this._jobsQueue.on('error', (error) => {
+			this.emit('error', error);
 		});
 
-		self.on('error', error => {
-			self._debug(error);
+		this.on('error', error => {
+			this._debug(error);
 		})
 
 	}
@@ -123,29 +121,70 @@ class InewsConnectionClient extends EventEmitter {
 	}
 
 	connect(forceDisconnect = false) {
-		const self = this;
+		const delay = (ms) => {
+			return new Promise((resolve) => {
+				setTimeout(() => {
+					resolve();
+				}, ms);
+			});
+		}
+
+		const connectFtp = (ftpConnConfig) => {
+			this.status = 'connecting';
+
+			return new Promise((resolve, reject) => {
+				let returned = false;
+
+				const onReady = () => {
+					if(!returned) {
+						returned = true;
+						this._currentDir = null;
+						removeListeners();
+						resolve(this._ftpConn);
+					}
+				}
+
+				const onError = (error) => {
+					if(!returned) {
+						returned = true;
+						removeListeners();
+						reject(error);
+					}
+				}
+
+				const removeListeners = () => {
+					this._ftpConn.removeListener('ready', onReady);
+					this._ftpConn.removeListener('error', onError);
+				}
+
+				this._ftpConn.once('ready', onReady);
+				this._ftpConn.once('error', onError);
+				this._ftpConn.connect(ftpConnConfig);
+			});
+		}
+
 		return new Promise(async (resolve, reject) => {
 			if(this.status === 'connected' && !forceDisconnect)
 				resolve(this._ftpConn);
-			else if(typeof self._connectionInProgress === 'undefined' || !self._connectionInProgress) { // change to status
+			else if(typeof this._connectionInProgress === 'undefined' || !this._connectionInProgress) { // change to status
 				this._connectionInProgress = true;
 				this._currentDir = null;
 
 				// Retry as many times as allowed (may be infinite)
-				for(let reconnectsAttempted = 0; (typeof self.config.maxReconnectAttempts !== 'number' || self.config.maxReconnectAttempts < 0 || reconnectsAttempted < self.config.maxReconnectAttempts); reconnectsAttempted++) {
+				for(let reconnectsAttempted = 0; (typeof this.config.maxReconnectAttempts !== 'number' || this.config.maxReconnectAttempts < 0 || reconnectsAttempted < this.config.maxReconnectAttempts); reconnectsAttempted++) {
 					if(forceDisconnect || reconnectsAttempted > 0)
-						await self.disconnect();
+						await this.disconnect();
 
 					this._ftpConnConfig = {
-						host: self.config.hosts[reconnectsAttempted % self.config.hosts.length], // cycle through server
-						user: self.config.user,
-						password: self.config.password
+						host: this.config.hosts[reconnectsAttempted % this.config.hosts.length], // cycle through server
+						user: this.config.user,
+						password: this.config.password
 					};
 
-					self._debug('Connecting to', this._ftpConnConfig.host);
+					this._debug('Connecting to', this._ftpConnConfig.host);
 
-					if(reconnectsAttempted > 0 && typeof self.config.reconnectTimeout === 'number' && self.config.reconnectTimeout > 0)
-						await delay(self.config.reconnectTimeout);
+					if(reconnectsAttempted > 0 && typeof this.config.reconnectTimeout === 'number' && this.config.reconnectTimeout > 0)
+						await delay(this.config.reconnectTimeout);
 
 					try {
 						await connectFtp(this._ftpConnConfig);
@@ -164,58 +203,16 @@ class InewsConnectionClient extends EventEmitter {
 			}
 		});
 
-		function delay(ms) {
-			return new Promise((resolve) => {
-				setTimeout(() => {
-					resolve();
-				}, ms);
-			});
-		}
 
-		function connectFtp(ftpConnConfig) {
-			self.status = 'connecting';
-
-			return new Promise((resolve, reject) => {
-				let returned = false;
-
-				function onReady() {
-					if(!returned) {
-						returned = true;
-						self._currentDir = null;
-						removeListeners();
-						resolve(self._ftpConn);
-					}
-				}
-
-				function onError(error) {
-					if(!returned) {
-						returned = true;
-						removeListeners();
-						reject(error);
-					}
-				}
-
-				function removeListeners() {
-					self._ftpConn.removeListener('ready', onReady);
-					self._ftpConn.removeListener('error', onError);
-				}
-
-				self._ftpConn.once('ready', onReady);
-				self._ftpConn.once('error', onError);
-				self._ftpConn.connect(ftpConnConfig);
-			});
-		}
 	}
 
 	disconnect() {
-		const self = this;
-
 		return new Promise((resolve, reject) => {
-			if(self._ftpConn.connected) {
-				self.once('end', function() {
+			if(this._ftpConn.connected) {
+				this.once('end', () => {
 					resolve();
 				});
-				self._ftpConn.end();
+				this._ftpConn.end();
 			}
 			else
 				resolve();
@@ -235,59 +232,98 @@ class InewsConnectionClient extends EventEmitter {
 	}
 
 	storyNsml(directory, file) {
-		const self = this;
 		const promisePath = ['storyNsml', directory, file];
 
-		if(self._pendingPromises.has(promisePath))
-			return self._pendingPromises.get(promisePath);
+		if(this._pendingPromises.has(promisePath))
+			return this._pendingPromises.get(promisePath);
 		else {
-			self._lastDirectory = directory;
+			this._lastDirectory = directory;
 			let operationAttempts = 0;
-			const jobPromise = self._jobsQueue.enqueue({
+			const jobPromise = this._jobsQueue.enqueue({
 				start: () => {
-					return self.connect()
-						.then(() => self._cwd(directory))
-						.then(() => self._get(file));
+					return this.connect()
+						.then(() => this._cwd(directory))
+						.then(() => this._get(file));
 				},
 				startFilter: () => {
-					return self.canStartNextJob(directory);
+					return this.canStartNextJob(directory);
 				},
 				retryFilter: (error) => {
 					operationAttempts++;
-					return (operationAttempts < self.config.maxAttempts && error.message !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
+					return (operationAttempts < this.config.maxAttempts && error.message !== 'cwd_failed' && !error.message.includes('no such story') && !error.message.includes('invalid story identifier'));
 				},
-				timeout: self.config.timeout
+				timeout: this.config.timeout
 			}).finally(() => {
-				self._pendingPromises.delete(promisePath);
+				this._pendingPromises.delete(promisePath);
 			});
 
-			self._pendingPromises.set(promisePath, jobPromise);
+			this._pendingPromises.set(promisePath, jobPromise);
 			return jobPromise;
 		}
 	}
 
 	list(directory) {
-		const self = this;
-
 		const promisePath = ['list', directory];
 
-		if(self._pendingPromises.has(promisePath))
-			return self._pendingPromises.get(promisePath);
+		const delay = (ms) => {
+			return new Promise((resolve) => {
+				setTimeout(() => {
+					resolve();
+				}, ms);
+			});
+		}
+
+		const connectFtp = (ftpConnConfig) => {
+			this.status = 'connecting';
+
+			return new Promise((resolve, reject) => {
+				let returned = false;
+
+				const onReady = () => {
+					if(!returned) {
+						returned = true;
+						this._currentDir = null;
+						removeListeners();
+						resolve(this._ftpConn);
+					}
+				}
+
+				const onError = (error) => {
+					if(!returned) {
+						returned = true;
+						removeListeners();
+						reject(error);
+					}
+				}
+
+				const removeListeners = () => {
+					this._ftpConn.removeListener('ready', onReady);
+					this._ftpConn.removeListener('error', onError);
+				}
+
+				this._ftpConn.once('ready', onReady);
+				this._ftpConn.once('error', onError);
+				this._ftpConn.connect(ftpConnConfig);
+			});
+		}
+
+		if(this._pendingPromises.has(promisePath))
+			return this._pendingPromises.get(promisePath);
 		else {
-			self._lastDirectory = directory;
+			this._lastDirectory = directory;
 			let operationAttempts = 0;
-			const jobPromise = self._jobsQueue.enqueue({
+			const jobPromise = this._jobsQueue.enqueue({
 				start: () => {
-					return self.connect()
-						.then(() => self._cwd(directory))
+					return this.connect()
+						.then(() => this._cwd(directory))
 						.then(() => new Promise((resolve, reject) => {
-							self._ftpConn.list((error, list) => {
+							this._ftpConn.list((error, list) => {
 								if (error)
 									reject(error);
 								else {
 									let fileNames = [];
 									if (Array.isArray(list)) {
-										list.forEach(function (listItem) {
+										list.forEach((listItem) => {
 											let file = InewsConnectionClient.fileFromListItem(listItem);
 											if (typeof file !== 'undefined')
 												fileNames.push(file);
@@ -300,18 +336,18 @@ class InewsConnectionClient extends EventEmitter {
 
 				},
 				startFilter: () => {
-					return self.canStartNextJob(directory);
+					return this.canStartNextJob(directory);
 				},
 				retryFilter: (error) => {
 					operationAttempts++;
-					return (operationAttempts < self.config.maxAttempts && !error.message.includes('No such directory'));
+					return (operationAttempts < this.config.maxAttempts && !error.message.includes('No such directory'));
 				},
-				timeout: self.config.timeout
+				timeout: this.config.timeout
 			}).finally(() => {
-				self._pendingPromises.delete(promisePath);
+				this._pendingPromises.delete(promisePath);
 			});
 
-			self._pendingPromises.set(promisePath, jobPromise);
+			this._pendingPromises.set(promisePath, jobPromise);
 			return jobPromise;
 		}
 	}
@@ -322,55 +358,52 @@ class InewsConnectionClient extends EventEmitter {
 	}
 
 	_cwd(requestedDir) {
-		const self = this;
-
-		if(requestedDir === self._currentDir) { // Already in dir
+		if(requestedDir === this._currentDir) { // Already in dir
 			return new Promise((resolve, reject) => {
-				resolve(self._currentDir);
+				resolve(this._currentDir);
 			})
 		}
-		else if(requestedDir === self._requestedDir) // CWD to same directory in progress
-			return self._cwdPromise;
-		else if(self._requestedDir !== undefined) { // CWD in progress to different directory
+		else if(requestedDir === this._requestedDir) // CWD to same directory in progress
+			return this._cwdPromise;
+		else if(this._requestedDir !== undefined) { // CWD in progress to different directory
 			return new Promise((resolve, reject) => {
 				reject('cwd_in_progress');
 			});
 		}
 		else { // change directory
-			self._requestedDir = requestedDir;
-			self._cwdPromise = new Promise((resolve, reject) => {
-				self._ftpConn.cwd(requestedDir, (error, currentDir) => {
-					delete self._requestedDir;
+			this._requestedDir = requestedDir;
+			this._cwdPromise = new Promise((resolve, reject) => {
+				this._ftpConn.cwd(requestedDir, (error, currentDir) => {
+					delete this._requestedDir;
 
 					if(error) {
-						self._currentDir = null;
-						self.emit('error', error);
+						this._currentDir = null;
+						this.emit('error', error);
 						reject(error);
 					}
 					else {
-						self._currentDir = currentDir;
+						this._currentDir = currentDir;
 						resolve(currentDir);
 					}
 
-					self.emit('cwd', self._currentDir);
+					this.emit('cwd', this._currentDir);
 				});
 			});
-			return self._cwdPromise;
+			return this._cwdPromise;
 		}
 	}
 
 	_get(file) {
-		const self = this;
 		return new Promise((resolve, reject, onCancel) => {
 
-			self._ftpConn.get(file, (error, stream) => {
-				self.emit('stream');
+			this._ftpConn.get(file, (error, stream) => {
+				this.emit('stream');
 				onCancel(() => {
 					try {
 						stream.destroy();
 					}
 					catch(error) {
-						self.emit('error', error);
+						this.emit('error', error);
 					}
 				});
 

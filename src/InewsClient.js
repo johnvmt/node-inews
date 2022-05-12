@@ -65,46 +65,48 @@ class InewsClient extends EventEmitter {
 	}
 
 	list(directory) {
-		const self = this;
 		const requestPath = ['list', directory];
 
-		if(self._pendingRequestConnectionClients.has(requestPath))
-			return self._pendingRequestConnectionClients.get(requestPath).list(directory);
+		if(this._pendingRequestConnectionClients.has(requestPath))
+			return this._pendingRequestConnectionClients.get(requestPath).list(directory);
 		else {
-			const connectionClient = self._optimalConnectionClient(directory);
-			self._pendingRequestConnectionClients.set(requestPath, connectionClient);
-			return connectionClient.list(directory).finally(() => {
-				self._pendingRequestConnectionClients.delete(requestPath);
+			const connectionClient = this._optimalConnectionClient(directory);
+			this._pendingRequestConnectionClients.set(requestPath, connectionClient);
+
+			const ftpDirectory = directory === ""
+				? "/"
+				: directory;
+
+			return connectionClient.list(ftpDirectory).finally(() => {
+				this._pendingRequestConnectionClients.delete(requestPath);
 			});
 		}
 	}
 
 	story(directory, file) {
-		const self = this;
 		const requestPath = ['story', directory, file];
 
-		if(self._pendingRequestConnectionClients.has(requestPath))
-			return self._pendingRequestConnectionClients.get(requestPath).story(directory, file);
+		if(this._pendingRequestConnectionClients.has(requestPath))
+			return this._pendingRequestConnectionClients.get(requestPath).story(directory, file);
 		else {
-			const connectionClient = self._optimalConnectionClient(directory);
-			self._pendingRequestConnectionClients.set(requestPath, connectionClient);
+			const connectionClient = this._optimalConnectionClient(directory);
+			this._pendingRequestConnectionClients.set(requestPath, connectionClient);
 			return connectionClient.story(directory, file).finally(() => {
-				self._pendingRequestConnectionClients.delete(requestPath);
+				this._pendingRequestConnectionClients.delete(requestPath);
 			});
 		}
 	}
 
 	storyNsml(directory, file) {
-		const self = this;
 		const requestPath = ['story', directory, file];
 
-		if(self._pendingRequestConnectionClients.has(requestPath))
-			return self._pendingRequestConnectionClients.get(requestPath).storyNsml(directory, file);
+		if(this._pendingRequestConnectionClients.has(requestPath))
+			return this._pendingRequestConnectionClients.get(requestPath).storyNsml(directory, file);
 		else {
-			const connectionClient = self._optimalConnectionClient(directory);
-			self._pendingRequestConnectionClients.set(requestPath, connectionClient);
+			const connectionClient = this._optimalConnectionClient(directory);
+			this._pendingRequestConnectionClients.set(requestPath, connectionClient);
 			return connectionClient.storyNsml(directory, file).finally(() => {
-				self._pendingRequestConnectionClients.delete(requestPath);
+				this._pendingRequestConnectionClients.delete(requestPath);
 			});
 		}
 	}
@@ -154,7 +156,6 @@ class InewsClient extends EventEmitter {
     }
 
 	_addConnectionClient() {
-		const self = this;
 	    let hosts = this.config.hosts;
         if(this.config.rotateHosts) {
             const hostStartIndex = (typeof this._hostStartIndex === 'number') ? (this._hostStartIndex + 1) % hosts.length : 0;
@@ -165,29 +166,29 @@ class InewsClient extends EventEmitter {
         const connectionClient = new InewsConnectionClient(Object.assign({}, this.config, {hosts: hosts}));
 
 		connectionClient.on('error', (error) => {
-			self.emit('error', error);
+			this.emit('error', error);
 		});
 
 		connectionClient.on('queued', (queued) => {
-			self.emit('queued', self.queued);
+			this.emit('queued', this.queued);
 		});
 
 		connectionClient.on('running', (running) => {
-			self.emit('running', self.running);
+			this.emit('running', this.running);
 		});
 
 		connectionClient.on('requests', (requests) => {
-			self.emit('requests', self.requests);
+			this.emit('requests', this.requests);
 
 			if(requests > 0)
-				self._deleteConnectionClientTimeout(connectionClient);
+				this._deleteConnectionClientTimeout(connectionClient);
 			else
-				self._resetConnectionClientTimeout(connectionClient);
+				this._resetConnectionClientTimeout(connectionClient);
 		});
 
-		self._connectionClients.add(connectionClient);
+		this._connectionClients.add(connectionClient);
 
-		self.emit('connections', self.connections);
+		this.emit('connections', this.connections);
 
 		return connectionClient;
     }
@@ -209,13 +210,12 @@ class InewsClient extends EventEmitter {
 	}
 
 	_resetConnectionClientTimeout(connectionClient) {
-		const self = this;
-		self._deleteConnectionClientTimeout(connectionClient);
+		this._deleteConnectionClientTimeout(connectionClient);
 
-		if(typeof self.config.connectionIdleTimeout === 'number' && self.config.connectionIdleTimeout > 0) {
+		if(typeof this.config.connectionIdleTimeout === 'number' && this.config.connectionIdleTimeout > 0) {
 			const connectionClientTimeout = setTimeout(() => {
-				self._deleteConnectionClient(connectionClient);
-			}, self.config.connectionIdleTimeout);
+				this._deleteConnectionClient(connectionClient);
+			}, this.config.connectionIdleTimeout);
 			this._connectionClientTimeouts.set(connectionClient, connectionClientTimeout);
 		}
 	}

@@ -6,41 +6,39 @@ class JobsQueue extends EventEmitter {
 	constructor() {
 		super();
 
-		const self = this;
-
 		Promise.config({
 			cancellation: true
 		});
 
-		self.queued = new Set();
-		self.running = new Set();
-
-		self.on('start', startQueue);
-		self.on('end', startQueue);
-		self.on('enqueue', startQueue);
-		self.on('cancel', startQueue);
+		this.queued = new Set();
+		this.running = new Set();
 
 		let queued = 0;
 		let running = 0;
 		let requests = 0;
-		function startQueue() {
-			if(self.queued.size !== queued) {
-				queued = self.queued.size;
-				self.emit('queued', queued);
+		const startQueue = () => {
+			if(this.queued.size !== queued) {
+				queued = this.queued.size;
+				this.emit('queued', queued);
 			}
 
-			if(self.running.size !== running) {
-				running = self.running.size;
-				self.emit('running', running);
+			if(this.running.size !== running) {
+				running = this.running.size;
+				this.emit('running', running);
 			}
 
-			if(self.running.size + self.queued.size !== requests) {
-				requests = self.running.size + self.queued.size;
-				self.emit('requests', requests);
+			if(this.running.size + this.queued.size !== requests) {
+				requests = this.running.size + this.queued.size;
+				this.emit('requests', requests);
 			}
 
-			self.startNext();
+			this.startNext();
 		}
+
+		this.on('start', startQueue);
+		this.on('end', startQueue);
+		this.on('enqueue', startQueue);
+		this.on('cancel', startQueue);
 	}
 
 	async startNext() {
@@ -68,9 +66,7 @@ class JobsQueue extends EventEmitter {
 	}
 
 	attemptJobWithRetries(job) {
-		const self = this;
-
-		return self.attemptJobOnce(job).catch((error) => {
+		return this.attemptJobOnce(job).catch((error) => {
 			if(typeof job.config.retryFilter === 'function' && job.config.retryFilter(error))
 				return this.attemptJobWithRetries(job);
 			else
@@ -79,7 +75,6 @@ class JobsQueue extends EventEmitter {
 	}
 
 	attemptJobOnce(job) {
-		const self = this;
 		return new Promise(async (resolve, reject, onCancel) => {
 			try {
 				let startResult = job.config.start();
@@ -94,7 +89,7 @@ class JobsQueue extends EventEmitter {
 								startResult.cancel();
 							}
 							catch(error) {
-								self.emit('error', error);
+								this.emit('error', error);
 							}
 						}
 					});
@@ -115,8 +110,6 @@ class JobsQueue extends EventEmitter {
 
 	enqueue(jobConfig) {
 		// return a cancelable promise
-		const self = this;
-
 		return new Promise((resolve, reject, onCancel) => {
 			let job = {
 				config: jobConfig,
@@ -124,17 +117,17 @@ class JobsQueue extends EventEmitter {
 				reject: reject
 			};
 
-			self.queued.add(job);
-			self.emit('enqueue', job);
+			this.queued.add(job);
+			this.emit('enqueue', job);
 
 			onCancel(() => {
-				if(self.queued.has(job)) {
-					self.queued.delete(job);
-					self.emit('cancel', job);
+				if(this.queued.has(job)) {
+					this.queued.delete(job);
+					this.emit('cancel', job);
 				}
-				else if(self.running.has(job)) {
+				else if(this.running.has(job)) {
 					job.attempts.cancel();
-					self.running.delete(job);
+					this.running.delete(job);
 				}
 			});
 		});
